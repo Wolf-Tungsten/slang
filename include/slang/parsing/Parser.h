@@ -311,6 +311,11 @@ private:
     syntax::MemberSyntax* parseClassMember(bool isIfaceClass, bool hasBaseClass);
     syntax::ContinuousAssignSyntax& parseContinuousAssign(AttrList attributes);
     syntax::DeclaratorSyntax& parseDeclarator(bool allowMinTypMax = false, bool requireInitializers = false);
+
+    /// Consumes an identifier, tolerating SV keywords in grammar positions
+    /// where only a name can appear (e.g. struct member / declarator names
+    /// emitted by tools like firtool: `from`, `until`, ...).
+    Token expectIdentifier();
     syntax::MemberSyntax* parseCoverageMember();
     syntax::BlockEventExpressionSyntax& parseBlockEventExpression();
     syntax::WithClauseSyntax* parseWithClause();

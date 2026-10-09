@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //------------------------------------------------------------------------------
 #include "slang/diagnostics/ParserDiags.h"
+#include "slang/parsing/LexerFacts.h"
 #include "slang/parsing/Lexer.h"
 #include "slang/parsing/Parser.h"
 #include "slang/parsing/Preprocessor.h"
@@ -431,6 +432,11 @@ AssignmentPatternExpressionSyntax& Parser::parseAssignmentPatternExpression(Data
     if (peek(TokenKind::DefaultKeyword)) {
         firstExpr = &factory.literalExpression(SyntaxKind::DefaultPatternKeyExpression, consume());
     }
+    else if (LexerFacts::isKeyword(peek().kind) && peek(1).kind == TokenKind::Colon) {
+        // A structure pattern member key that collides with an SV keyword
+        // (tool-generated netlists emit such field names verbatim).
+        firstExpr = &factory.identifierName(expectIdentifier());
+    }
     else if (peek(TokenKind::CloseBrace)) {
         // This is an empty pattern -- we'll just warn and continue on.
         addDiag(diag::EmptyAssignmentPattern, openBrace.location());
@@ -453,7 +459,7 @@ AssignmentPatternExpressionSyntax& Parser::parseAssignmentPatternExpression(Data
             if (peek(TokenKind::Comma)) {
                 buffer.push_back(consume());
 
-                parseList<isPossibleExpressionOrCommaOrDefault, isEndOfBracedList>(
+                parseList<isPossibleAssignmentKeyOrCommaOrDefault, isEndOfBracedList>(
                     buffer, TokenKind::CloseBrace, TokenKind::Comma, closeBrace,
                     RequireItems::False, diag::ExpectedAssignmentKey,
                     [this] { return &parseAssignmentPatternItem(nullptr); });
@@ -509,6 +515,8 @@ AssignmentPatternItemSyntax& Parser::parseAssignmentPatternItem(ExpressionSyntax
     if (!key) {
         if (peek(TokenKind::DefaultKeyword))
             key = &factory.literalExpression(SyntaxKind::DefaultPatternKeyExpression, consume());
+        else if (LexerFacts::isKeyword(peek().kind) && peek(1).kind == TokenKind::Colon)
+            key = &factory.identifierName(expectIdentifier());
         else
             key = &parseExpression();
     }
@@ -624,7 +632,7 @@ ExpressionSyntax& Parser::parsePostfixExpression(ExpressionSyntax& lhs,
                         name = consume();
                         break;
                     default:
-                        name = expect(TokenKind::Identifier);
+                        name = expectIdentifier();
                         break;
                 }
 
@@ -816,6 +824,13 @@ NameSyntax& Parser::parseNamePart(bitmask<NameOptions> options) {
     Token identifier;
     if (next == TokenKind::Identifier) {
         identifier = consume();
+    }
+    else if (LexerFacts::isKeyword(next)) {
+        // A name segment that collides with an SV keyword (tool-generated
+        // netlists emit such member names verbatim, e.g. `x.from`/`x.until`).
+        Token keywordToken = consume();
+        identifier = Token(alloc, TokenKind::Identifier, keywordToken.trivia(),
+                           keywordToken.rawText(), keywordToken.location());
     }
     else if (next != TokenKind::Dot && next != TokenKind::DoubleColon &&
              options.has(NameOptions::ExpectingExpression)) {

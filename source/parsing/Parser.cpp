@@ -8,6 +8,7 @@
 #include "slang/parsing/Parser.h"
 
 #include "slang/diagnostics/ParserDiags.h"
+#include "slang/parsing/LexerFacts.h"
 #include "slang/util/SmallMap.h"
 
 namespace slang::parsing {
@@ -899,8 +900,26 @@ LocalVariableDeclarationSyntax& Parser::parseLocalVariableDeclaration() {
     return factory.localVariableDeclaration(nullptr, var, dataType, declarators, semi);
 }
 
+Token Parser::expectIdentifier() {
+    if (peek(TokenKind::Identifier))
+        return consume();
+
+    // Tool-generated netlists (e.g. firtool) emit plain identifiers that
+    // collide with SV keywords (struct member names such as `from`/`until`).
+    // In grammar positions that only accept a name (declarators, member
+    // accesses), any keyword is unambiguously that name, so accept it
+    // verbatim as an identifier token. Same rationale as the upstream
+    // Unique/And/Or/Xor member-name special case.
+    if (LexerFacts::isKeyword(peek().kind)) {
+        Token keywordToken = consume();
+        return Token(alloc, TokenKind::Identifier, keywordToken.trivia(),
+                     keywordToken.rawText(), keywordToken.location());
+    }
+    return expect(TokenKind::Identifier);
+}
+
 DeclaratorSyntax& Parser::parseDeclarator(bool allowMinTypMax, bool requireInitializers) {
-    auto name = expect(TokenKind::Identifier);
+    auto name = expectIdentifier();
     auto dimensions = parseDimensionList();
 
     EqualsValueClauseSyntax* initializer = nullptr;
@@ -920,20 +939,20 @@ template<bool (*IsEnd)(TokenKind)>
 std::span<TokenOrSyntax> Parser::parseDeclarators(TokenKind endKind, Token& end,
                                                   bool allowMinTypMax, bool requireInitializers) {
     SmallVector<TokenOrSyntax, 4> buffer;
-    parseList<isIdentifierOrComma, IsEnd>(buffer, endKind, TokenKind::Comma, end,
-                                          RequireItems::True, diag::ExpectedDeclarator,
-                                          [this, allowMinTypMax, requireInitializers] {
-                                              return &parseDeclarator(allowMinTypMax,
-                                                                      requireInitializers);
-                                          });
+    parseList<isIdentifierOrCommaOrKeyword, IsEnd>(buffer, endKind, TokenKind::Comma, end,
+                                                   RequireItems::True, diag::ExpectedDeclarator,
+                                                   [this, allowMinTypMax, requireInitializers] {
+                                                       return &parseDeclarator(allowMinTypMax,
+                                                                               requireInitializers);
+                                                   });
 
     return buffer.copy(alloc);
 }
 
 std::span<TokenOrSyntax> Parser::parseDeclarators(Token& semi, bool allowMinTypMax,
                                                   bool requireInitializers) {
-    return parseDeclarators<isNotIdOrComma>(TokenKind::Semicolon, semi, allowMinTypMax,
-                                            requireInitializers);
+    return parseDeclarators<isNotIdOrCommaOrKeyword>(TokenKind::Semicolon, semi, allowMinTypMax,
+                                                     requireInitializers);
 }
 
 Parser::AttrList Parser::parseAttributes() {

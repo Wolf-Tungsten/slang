@@ -136,6 +136,13 @@ public:
     /// @return true if the given token represents an identifier or a comma.
     static bool isIdentifierOrComma(TokenKind kind);
 
+    /// isIdentifierOrComma plus any SV keyword (tool-generated netlists use
+    /// keyword-colliding plain names in declarator position).
+    static bool isIdentifierOrCommaOrKeyword(TokenKind kind);
+
+    /// Negation of isIdentifierOrCommaOrKeyword.
+    static bool isNotIdOrCommaOrKeyword(TokenKind kind);
+
     /// @return true if the given token is not an identifier or a comma.
     static bool isNotIdOrComma(TokenKind kind);
 
@@ -145,6 +152,11 @@ public:
     /// @return true if the given token represents a possible expression, comma, or "default"
     /// keyword.
     static bool isPossibleExpressionOrCommaOrDefault(TokenKind kind);
+
+    /// isPossibleExpressionOrCommaOrDefault plus any SV keyword (structured
+    /// assignment pattern member keys may collide with keywords in
+    /// tool-generated netlists).
+    static bool isPossibleAssignmentKeyOrCommaOrDefault(TokenKind kind);
 
     /// @return true if the given token represents a possible expression or "&&&" token.
     static bool isPossibleExpressionOrTripleAnd(TokenKind kind);

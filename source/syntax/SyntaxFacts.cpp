@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //------------------------------------------------------------------------------
 #include "slang/syntax/SyntaxFacts.h"
+#include "slang/parsing/LexerFacts.h"
 
 #include "slang/syntax/AllSyntax.h"
 
@@ -713,12 +714,25 @@ bool SyntaxFacts::isIdentifierOrComma(TokenKind kind) {
     return kind == TokenKind::Identifier || kind == TokenKind::Comma;
 }
 
+bool SyntaxFacts::isIdentifierOrCommaOrKeyword(TokenKind kind) {
+    return kind == TokenKind::Identifier || kind == TokenKind::Comma ||
+           parsing::LexerFacts::isKeyword(kind);
+}
+
+bool SyntaxFacts::isNotIdOrCommaOrKeyword(TokenKind kind) {
+    return !isIdentifierOrCommaOrKeyword(kind);
+}
+
 bool SyntaxFacts::isNotIdOrComma(TokenKind kind) {
     return kind != TokenKind::Identifier && kind != TokenKind::Comma;
 }
 
 bool SyntaxFacts::isPossibleExpressionOrComma(TokenKind kind) {
     return kind == TokenKind::Comma || isPossibleExpression(kind);
+}
+
+bool SyntaxFacts::isPossibleAssignmentKeyOrCommaOrDefault(TokenKind kind) {
+    return isPossibleExpressionOrCommaOrDefault(kind) || parsing::LexerFacts::isKeyword(kind);
 }
 
 bool SyntaxFacts::isPossibleExpressionOrCommaOrDefault(TokenKind kind) {
